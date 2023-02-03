@@ -1,0 +1,21 @@
+{
+    "name": "vigstudio/vig-seo",
+    "type": "botble-plugin",
+    "description": "SEO scanner for Botble CMS",
+    "homepage": "http://nghiane.com",
+    "authors": [
+        {
+            "name": "Nghĩa Nhè",
+            "homepage": "http://nghiane.com"
+        }
+    ],
+    "require": {
+        "vormkracht10/laravel-seo-scanner": "^1.1.0",
+        "ivopetkov/html5-dom-document-php": "1.*|2.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "VigStudio\\VigSEO\\": "src/"
+        }
+    }
+}
