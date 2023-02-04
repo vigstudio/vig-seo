@@ -343,13 +343,14 @@ class ContentAnalyze
         return trim($string);
     }
 
-    private function extractKeywords(string $string, array $stopWords): array
+    private function extractKeywords(string $text, array $stopWords): array
     {
-        $$string = preg_replace('/[^\p{L}\p{N}]+/u', '', $string);
-        $words = preg_split('/\s+/', $string);
+        $words = preg_split("/[\s,]+/", $text);
+        $wordCounts = array_count_values($words);
         $keywords = [];
-        foreach ($words as $word) {
-            if (! in_array($word, $stopWords) && strlen($word) >= 4) {
+
+        foreach ($wordCounts as $word => $count) {
+            if (strlen($word) > 3 && ! in_array(strtolower($word), $stopWords)) {
                 $keywords[] = $word;
             }
         }
@@ -357,7 +358,7 @@ class ContentAnalyze
         return $keywords;
     }
 
-    private function getLongTailKeywords(Crawler $document)
+    private function getLongTailKeywords(Crawler $document): array
     {
         return [];
     }
