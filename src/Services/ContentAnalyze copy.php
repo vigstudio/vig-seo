@@ -2,6 +2,8 @@
 
 namespace VigStudio\VigSeo\Services;
 
+use Exception;
+use IvoPetkov\HTML5DOMDocument;
 use Symfony\Component\DomCrawler\Crawler;
 
 class ContentAnalyze
@@ -169,6 +171,8 @@ class ContentAnalyze
 
     private $domainname;
 
+    private $language = null;
+
     public function addStopWords($words)
     {
         $this->stopWords = array_merge($this->stopWords, $words);
@@ -186,150 +190,649 @@ class ContentAnalyze
         $this->domainname = parse_url($url, PHP_URL_HOST);
 
         $document = $this->parseHtml($content);
+        $nodes = $this->parseHtmlIntoBlocks($document);
+
+        $crawler = new Crawler($document);
+
+        $images = $crawler->filterXPath('//img')->extract(['src', 'alt']);
+
+        $titleNode = $document->querySelector('title');
+        $title = null;
+        if ($titleNode !== null) {
+            $title = $this->getTextContent($titleNode->outerHTML);
+        }
+
+        $description = '';
+        $metaNodes = $document->querySelectorAll('meta');
+        foreach ($metaNodes as $node) {
+            $attributes = $node->getAttributes();
+            if (isset($attributes['name']) && isset($attributes['content']) && $attributes['name'] === 'description') {
+                $description = $attributes['content'];
+            }
+        }
+
+        $htmlNodes = $document->querySelectorAll('html');
+        foreach ($htmlNodes as $node) {
+            $attributes = $node->getAttributes();
+            if (isset($attributes['lang'])) {
+                $this->language = $attributes['lang'];
+            }
+        }
+
+        $canonical = '';
+        $linkNodes = $document->querySelectorAll('link');
+        foreach ($linkNodes as $node) {
+            $attributes = $node->getAttributes();
+            if (isset($attributes['rel']) && isset($attributes['href']) && $attributes['rel'] === 'canonical') {
+                $canonical = $attributes['href'];
+            }
+        }
+
+        //Full page result
+        $usableSource = $content;
+        $usableText = $this->getTextContent($usableSource);
+
+        $htmlTxtRatio = 0;
+        if (strlen($usableSource) > 0) {
+            $htmlTxtRatio = strlen($usableText) / strlen($usableSource) * 100;
+        }
+
+        $fullPageResult = [
+            'codeToTxtRatio' => [
+                'total_length' => strlen($usableSource),
+                'text_length' => strlen($usableText),
+                'ratio' => $htmlTxtRatio,
+            ],
+            'word_count' => $this->countWords($usableText),
+            'keywords' => $this->findKeywords($usableText),
+            'longTailKeywords' => $this->getLongTailKeywords($usableText),
+            'headers' => $this->doHeaderResult($document),
+            'links' => $this->doLinkResult($document),
+            'images' => $this->doImageResult($document),
+        ];
+
+        //Usable Node result
+        $node = null;
+        if ($nodes !== null) {
+            $node = $this->getWebsiteUsabelNode($nodes);
+            if (isset($node['node'])) {
+                $node = $node['node'];
+                $usableSource = $node->outerHTML;
+                $usableText = $this->getTextContent($usableSource);
+            } else {
+                $node = null;
+            }
+        }
+
+        if (empty($node)) {
+            $node = $document->querySelector('body');
+            if ($node === null) {
+                $node = $document->querySelector('html');
+            }
+            if ($node !== null) {
+                $usableSource = $node->outerHTML;
+                $usableText = $this->getTextContent($usableSource);
+            } else {
+                $usableSource = '';
+                $usableText = '';
+            }
+        }
+
+        $htmlTxtRatio = 0;
+        if (strlen($usableSource) > 0) {
+            $htmlTxtRatio = strlen($usableText) / strlen($usableSource) * 100;
+        }
+
+        $mainTxtResult = [
+            'text' => $usableText,
+            'codeToTxtRatio' => [
+                'total_length' => strlen($usableSource),
+                'text_length' => strlen($usableText),
+                'ratio' => $htmlTxtRatio,
+            ],
+            'word_count' => $this->countWords($usableText),
+            'keywords' => $this->findKeywords($usableText),
+            'longTailKeywords' => $this->getLongTailKeywords($usableText),
+            'headers' => $node !== null ? $this->doHeaderResult($node) : null,
+            'links' => $node !== null ? $this->doLinkResult($node) : null,
+            'images' => $node !== null ? $this->doImageResult($node) : null,
+        ];
 
         $result = [
             'url' => $url,
+            'canonical' => $canonical,
             'baseUrl' => $this->baseUrl,
             'domainUrl' => $this->domainUrl,
             'domainname' => $this->domainname,
-            'title' => $this->getTitle($document),
-            'description' => $this->getDescription($document),
-            'language' => $this->getLanguage($document),
-            'mainText' => $this->getMainText($document),
-            'headers' => $this->getHeadings($document),
-            'links' => $this->getLinks($document),
-            'keywords' => $this->getKeywords($document),
-            'longTailKeywords' => $this->getLongTailKeywords($document),
+            'title' => $title,
+            'description' => $description,
+            'language' => $this->language,
+            'full_page' => $fullPageResult,
+            'main_text' => $mainTxtResult,
         ];
 
         return $result;
     }
 
-    private function parseHtml($body): Crawler
+    private function getTextContent($text)
     {
-        $crawler = new Crawler($body);
+        $text = preg_replace(
+            [
+                // Remove invisible content
+                '@<head[^>]*?>.*?</head>@siu',
+                '@<style[^>]*?>.*?</style>@siu',
+                '@<script[^>]*?.*?</script>@siu',
+                '@<object[^>]*?.*?</object>@siu',
+                '@<embed[^>]*?.*?</embed>@siu',
+                '@<applet[^>]*?.*?</applet>@siu',
+                '@<noframes[^>]*?.*?</noframes>@siu',
+                '@<noscript[^>]*?.*?</noscript>@siu',
+                '@<noembed[^>]*?.*?</noembed>@siu',
 
-        return $crawler;
+                // Add line breaks before & after blocks
+                '@<((br)|(hr))@iu',
+                '@</?((address)|(blockquote)|(center)|(del))@iu',
+                '@</?((div)|(h[1-9])|(ins)|(isindex)|(p)|(pre))@iu',
+                '@</?((dir)|(dl)|(dt)|(dd)|(li)|(menu)|(ol)|(ul))@iu',
+                '@</?((table)|(th)|(td)|(caption))@iu',
+                '@</?((form)|(button)|(fieldset)|(legend)|(input))@iu',
+                '@</?((label)|(select)|(optgroup)|(option)|(textarea))@iu',
+                '@</?((frameset)|(frame)|(iframe))@iu',
+            ],
+            [
+                ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                "\n\$0", "\n\$0", "\n\$0", "\n\$0", "\n\$0", "\n\$0",
+                "\n\$0", "\n\$0",
+            ],
+            $text
+        );
+
+        // Remove all remaining tags and comments and return.
+        return strip_tags($text);
     }
 
-    private function getTitle(Crawler $document): string|null
+    private function getWebsiteUsabelNode($nodes)
     {
-        $titleNode = $document->filter('head > title');
-        if ($titleNode->count() > 0) {
-            $title = $titleNode->text();
-        } else {
-            $title = null;
+        $node = $this->findLargestNode($nodes);
+
+        return $node;
+    }
+
+    private function findLargestNode($nodes)
+    {
+        $largestNode = null;
+        $largestTxtLength = 0;
+        foreach ($nodes as $token => $node) {
+            $length = strlen($this->getTextContent($node['node']->outerHTML));
+            if ($largestTxtLength < $length) {
+                $largestTxtLength = $length;
+                $largestNode = $node;
+            }
         }
 
-        return $title;
-    }
+        if ($largestNode === null) {
+            return $nodes;
+        }
+        $largestChildNode = $this->findLargestChildNode($largestNode['childs'], $largestTxtLength);
 
-    private function getLanguage(Crawler $document): string|null
-    {
-        $langNode = $document->filter('html')->attr('lang');
-        if ($langNode) {
-            $lang = $langNode;
-        } else {
-            $lang = null;
+        if ($largestChildNode === false) {
+            return $largestNode;
+
+            throw new Exception("Can't find main text block.");
         }
 
-        return $lang;
+        return $largestChildNode;
     }
 
-    private function getDescription(Crawler $document): string|null
+    private function parseHtml($body)
     {
-        $descriptionNode = $document->filter('head > meta[name="description"]');
-        if ($descriptionNode->count() > 0) {
-            $description = $descriptionNode->attr('content');
-        } else {
-            $description = null;
+        $dom = new HTML5DOMDocument();
+        $dom->loadHTML($body, HTML5DOMDocument::ALLOW_DUPLICATE_IDS);
+
+        return $dom;
+    }
+
+    private function parseHtmlIntoBlocks($document)
+    {
+        $bodyNode = $document->querySelector('body');
+
+        $nodes = $this->loadChilds($bodyNode);
+
+        return $nodes;
+    }
+
+    private function loadChilds($node)
+    {
+        if ($node === null) {
+            return;
         }
+        $parentTagName = $node->tagName;
+        $parentToken = md5($node->outerHTML);
+        $qry = $node->querySelectorAll('*');
 
-        return $description;
-    }
-
-    private function getLinks(Crawler $document): array
-    {
-        $follow = [];
-        $nofollow = [];
-        $internal = [];
-        $external = [];
-
-        $document->filter('a')->each(function (Crawler $node) use (&$follow, &$nofollow, &$internal, &$external) {
-            if ($node->attr('rel') === 'nofollow') {
-                $nofollow[] = $node->attr('href');
-            } else {
-                $follow[] = $node->attr('href');
+        $childs = [];
+        foreach ($qry as $child) {
+            if (! isset($node->tagName)) {
+                continue;
+            }
+            if (in_array($child->tagName, ['svg', 'script'])) {
+                continue;
             }
 
-            $url = parse_url($node->attr('href'));
-            if (isset($url['host']) && $url['host'] === $this->domainname) {
-                $internal[] = $node->attr('href');
-            } else {
-                $external[] = $node->attr('href');
+            if ($parentTagName === $child->parentNode->tagName && $parentToken === md5($child->parentNode->outerHTML)) {
+                $loadedChilds = $this->loadChilds($child);
+                $childs[md5($child->outerHTML)] = [
+                    'node' => $child,
+                    'childs' => $loadedChilds,
+                ];
             }
+        }
+
+        return $childs;
+    }
+
+    private function findLargestChildNode($nodes, $maxLength)
+    {
+        $largestNode = null;
+        $largestTxtLength = 0;
+        foreach ($nodes as $token => $node) {
+            $length = strlen($this->getTextContent($node['node']->outerHTML));
+            if ($largestTxtLength < $length) {
+                $largestTxtLength = $length;
+                $largestNode = $node;
+            }
+        }
+
+        if ($maxLength / 2 < $largestTxtLength) {
+            if (count($largestNode['childs']) === 0) {
+                return $largestNode;
+            }
+
+            $possibleLargestNode = $this->findLargestChildNode($largestNode['childs'], $maxLength);
+            if ($possibleLargestNode !== false) {
+                return $possibleLargestNode;
+            }
+
+            return $largestNode;
+        }
+
+        return false;
+    }
+
+    private function countWords($content)
+    {
+        return count(str_word_count(strtolower($content), 1));
+    }
+
+    private function findKeywords($content, $min = 3)
+    {
+        $words = $this->str_word_count($content);
+
+        $word_count = array_count_values($words);
+        arsort($word_count);
+
+        foreach ($this->stopWords as $s) {
+            unset($word_count[$s]);
+        }
+
+        $word_count = array_filter($word_count, function ($value) use ($min) {
+            return $value >= $min;
         });
 
+        return $word_count;
+    }
+
+    private function getLongTailKeywords($strs, $len = 3, $min = 2)
+    {
+        $keywords = [];
+        if (! is_array($strs)) {
+            $strs = [$strs];
+        }
+
+        foreach ($strs as $str) {
+            $str = preg_split('/\s+-\s+|\s+/', $str, -1, PREG_SPLIT_NO_EMPTY);
+
+            while (0 < $len--) {
+                for ($i = 0; $i < count($str) - $len; $i++) {
+                    $word = array_slice($str, $i, $len + 1);
+                    if (in_array($word[0], $this->stopWords) || in_array(end($word), $this->stopWords)) {
+                        continue;
+                    }
+
+                    $word = implode(' ', $word);
+
+                    if (! isset($keywords[$len][$word])) {
+                        $keywords[$len][$word] = 0;
+                    }
+                    $keywords[$len][$word]++;
+                }
+            }
+        }
+
+        $return = [];
+        foreach ($keywords as &$keyword) {
+            $keyword = array_filter($keyword, function ($v) use ($min) {
+                return (bool) ($v > $min);
+            });
+            arsort($keyword);
+            $return = array_merge($return, $keyword);
+        }
+
+        return $return;
+    }
+
+    private function doHeaderResult($document)
+    {
+        $tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+        $result = [];
+
+        foreach ($tags as $tag) {
+            $elements = $document->querySelectorAll($tag);
+
+            $content = [];
+            foreach ($elements as $element) {
+                $content[] = $this->getTextContent($element->outerHTML);
+            }
+
+            $txt = implode(' ', $content);
+
+            $result[$tag] = [
+                'count' => count($content),
+                'words' => count(str_word_count(strtolower($txt), 1)),
+                'keywords' => $this->findKeywords($txt, 1),
+                'longTailKeywords' => $this->getLongTailKeywords($content, 2, 2),
+                'headers' => $content,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function doLinkResult($document)
+    {
+        $elements = $document->querySelectorAll('a');
+        $internal = 0;
+        $external = 0;
+        $follow = 0;
+        $nofollow = 0;
+
+        $content = [];
+        $links = [];
+        foreach ($elements as $element) {
+            $content[] = $this->getTextContent($element->outerHTML);
+            $attributes = $element->getAttributes();
+            if (isset($attributes['href'])) {
+                $url = $this->fixUrl($attributes['href']);
+
+                if (strpos(strtolower($url), 'javascript:') === 0) {
+                    continue;
+                }
+
+                $linkAnchor = trim($this->getTextContent($element->outerHTML));
+                if (empty($linkAnchor)) {
+                    $linkAnchor = strpos($element->outerHTML, '<img') !== false ? 'image' : $linkAnchor;
+                }
+                $link = [
+                    'url' => $url,
+                    'internal' => false,
+                    'nofollow' => false,
+                    'content' => $linkAnchor,
+                ];
+                if ($this->isInternal($url)) {
+                    $link['internal'] = true;
+                    $internal++;
+                } else {
+                    $link['internal'] = false;
+                    if (strpos(strtolower($url), 'tel:') === false && strpos(strtolower($url), 'mailto:') === false) {
+                        $external++;
+                    }
+                }
+
+                if (isset($attributes['rel'])) {
+                    if (strpos($attributes['rel'], 'nofollow') >= 0) {
+                        $link['nofollow'] = true;
+                        $nofollow++;
+                    } else {
+                        $follow++;
+                    }
+                } else {
+                    $follow++;
+                }
+
+                $links[] = $link;
+            }
+        }
+
+        $txt = implode(' ', $content);
+
         return [
-            'follow' => $follow,
-            'nofollow' => $nofollow,
+            'count' => count($content),
+            'words' => count(str_word_count(strtolower($txt), 1)),
+            'keywords' => $this->findKeywords($txt, 1),
+            'longTailKeywords' => $this->getLongTailKeywords($content, 2, 2),
             'internal' => $internal,
             'external' => $external,
+            'follow' => $follow,
+            'nofollow' => $nofollow,
+            'links' => $links,
         ];
     }
 
-    private function getMainText(Crawler $document): array
+    private function doImageResult($document)
     {
-        $nodes = [];
-        $document->filter('body')->children()->each(function (Crawler $node) use (&$nodes) {
-            $nodes[] = $node->text();
-        });
+        $elements = $document->querySelectorAll('img');
 
-        $text = $document->filter('body')->text();
-        $word_count = str_word_count($text);
+        $content = [];
+        $images = [];
+        foreach ($elements as $element) {
+            $attributes = $element->getAttributes();
+            $img = [
+                'src' => $attributes['src'] ?? null,
+                'alt' => $attributes['alt'] ?? null,
+                'title' => $attributes['title'] ?? null,
+            ];
+            if (isset($attributes['alt'])) {
+                $content[] = $this->getTextContent($attributes['alt']);
+            }
+            $img['src'] = $this->fixUrl($img['src']);
+
+            $images[] = $img;
+        }
+
+        $txt = implode(' ', $content);
 
         return [
-            'content' => $nodes,
-            'code_to_text_ratio' => $this->getCodeToTextRatio($document),
-            'word_count' => $word_count,
+            'count' => count($elements),
+            'count_alt' => count($content),
+            'words' => count(str_word_count(strtolower($txt), 1)),
+            'keywords' => $this->findKeywords($txt, 1),
+            'longTailKeywords' => $this->getLongTailKeywords($content, 2, 2),
+            'images' => $images,
         ];
     }
 
-    private function getCodeToTextRatio(Crawler $document): float
+    private function fixUrl($url)
     {
-        $text = $document->filter('body')->text();
-        $code = $document->filter('body')->html();
+        $url = str_replace('\\?', '?', $url);
+        $url = str_replace('\\&', '&', $url);
+        $url = str_replace('\\#', '#', $url);
+        $url = str_replace('\\~', '~', $url);
+        $url = str_replace('\\;', ';', $url);
 
-        $text_length = strlen($text);
-        $code_length = strlen($code);
+        if (strpos($url, '#') !== false) {
+            $url = substr($url, 0, strpos($url, '#'));
+        }
 
-        return ($text_length / $code_length) * 100;
+        if (strpos(strtolower($url), 'http://') === 0) {
+            return $url;
+        }
+
+        if (strpos(strtolower($url), 'https://') === 0) {
+            return $url;
+        }
+
+        if (strpos(strtolower($url), '/') === 0) {
+            return rtrim($this->domainUrl, '/').'/'.ltrim($url, '/');
+        }
+
+        if (strpos(strtolower($url), 'data:image') === 0) {
+            return $url;
+        }
+
+        if (strpos(strtolower($url), 'tel:') === 0) {
+            return $url;
+        }
+
+        if (strpos(strtolower($url), 'mailto:') === 0) {
+            return $url;
+        }
+
+        if (strpos(strtolower($url), 'javascript:') === 0) {
+            return $url;
+        }
+
+        $fixedUrl = $this->abs_url(ltrim($url, '/'), rtrim($this->baseUrl, '/'));
+        if ($fixedUrl === false) {
+            $fixedUrl = $url;
+        }
+
+        return $fixedUrl;
     }
 
-    private function getHeadings(Crawler $document): array
+    private function isInternal($url)
     {
-        $headers = [];
-        $document->filter('body h1, body h2, body h3, body h4, body h5, body h6')->each(function (Crawler $node, $i) use (&$headers) {
-            $tag = $node->nodeName();
-            $text = trim($node->text());
+        if (strpos($url, $this->domainname) > 0) {
+            return true;
+        }
 
-            if (! isset($headers[$tag])) {
-                $headers[$tag] = [];
+        return false;
+    }
+
+    private function str_word_count($string)
+    {
+        $string = str_replace(["\n", "\r"], '', $string);
+
+        $words = preg_split('~[\p{Z}\p{P}]+~u', mb_strtolower($string), null, PREG_SPLIT_NO_EMPTY);
+
+        $words = array_map(function ($word) {
+            $word = trim($word);
+            $word = $this->convertNumbers($word);
+
+            return ! ($word == '' || is_numeric($word)) ? $word : null;
+        }, $words);
+
+        return array_filter($words);
+    }
+
+    /**
+     * Converts non-english numbers to english numbers.
+     *
+     * @param $string
+     * @return string
+     */
+    private function convertNumbers($string)
+    {
+        return strtr($string, ['۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9']);
+    }
+
+    /**
+     * Build a URL.
+     *
+     * @param  array  $parts An array that follows the parse_url scheme
+     * @return string
+     */
+    public function build_url($parts)
+    {
+        if (isset($parts['scheme']) && ! in_array($parts['scheme'], ['http', 'https'])) {
+            return false;
+        }
+
+        if (empty($parts['user'])) {
+            $url = $parts['scheme'].'://'.$parts['host'];
+        } elseif (empty($parts['pass'])) {
+            $url = $parts['scheme'].'://'.$parts['user'].'@'.$parts['host'];
+        } else {
+            $url = $parts['scheme'].'://'.$parts['user'].':'.$parts['pass'].'@'.$parts['host'];
+        }
+
+        if (! empty($parts['port'])) {
+            $url .= ':'.$parts['port'];
+        }
+
+        if (! empty($parts['path'])) {
+            $url .= $parts['path'];
+        }
+
+        if (! empty($parts['query'])) {
+            $url .= '?'.$parts['query'];
+        }
+
+        if (! empty($parts['fragment'])) {
+            return $url.'#'.$parts['fragment'];
+        }
+
+        return $url;
+    }
+
+    /**
+     * Convert a relative path in to an absolute path.
+     *
+     * @param  string  $path
+     * @return string
+     */
+    public function abs_path($path)
+    {
+        $path_array = explode('/', $path);
+
+        // Solve current and parent folder navigation
+        $translated_path_array = [];
+        $i = 0;
+        foreach ($path_array as $name) {
+            if ($name === '..') {
+                unset($translated_path_array[--$i]);
+            } elseif (! empty($name) && $name !== '.') {
+                $translated_path_array[$i++] = $name;
+            }
+        }
+
+        return '/'.implode('/', $translated_path_array);
+    }
+
+    /**
+     * Convert a relative URL in to an absolute URL.
+     *
+     * @param  string  $url  URL or URI
+     * @param  string  $base Absolute URL
+     * @return string
+     */
+    public function abs_url($url, $base)
+    {
+        $url_parts = parse_url($url);
+        $base_parts = parse_url($base);
+
+        // Handle the path if it is specified
+        if (! empty($url_parts['path'])) {
+            // Is the path relative
+            if (substr($url_parts['path'], 0, 1) !== '/') {
+                if (isset($base_parts['path']) && substr($base_parts['path'], -1) === '/') {
+                    $url_parts['path'] = $base_parts['path'].$url_parts['path'];
+                } else {
+                    $url_parts['path'] = dirname($base_parts['path'] ?? null).'/'.$url_parts['path'];
+                }
             }
 
-            $headers[$tag][] = ['text' => $text];
-        });
+            // Make path absolute
+            $url_parts['path'] = $this->abs_path($url_parts['path']);
+        }
 
-        return $headers;
-    }
+        // Use the base URL to populate the unfilled components until a component is filled
+        foreach (['scheme', 'host', 'path', 'query', 'fragment'] as $comp) {
+            if (! empty($url_parts[$comp])) {
+                break;
+            }
+            $url_parts[$comp] = $base_parts[$comp] ?? null;
+        }
 
-    private function getKeywords(Crawler $document): array
-    {
-        return [];
-    }
-
-    private function getLongTailKeywords(Crawler $document)
-    {
-        return [];
+        return $this->build_url($url_parts);
     }
 }

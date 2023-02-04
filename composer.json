@@ -10,8 +10,7 @@
         }
     ],
     "require": {
-        "vormkracht10/laravel-seo-scanner": "^1.1.0",
-        "ivopetkov/html5-dom-document-php": "1.*|2.*"
+        "symfony/dom-crawler": "^6.2"
     },
     "autoload": {
         "psr-4": {
