@@ -179,7 +179,7 @@ class ContentAnalyze
         $this->stopWords = $words;
     }
 
-    public function analyze($url, $content = '')
+    public function analyze($url, $content = '', $keywords = [])
     {
         $this->baseUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST).'/'.ltrim(parse_url($url, PHP_URL_PATH), '/');
         $this->domainUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST);
@@ -200,7 +200,10 @@ class ContentAnalyze
             'links' => $this->getLinks($document),
             'keywords' => $this->getKeywords($document),
             'longTailKeywords' => $this->getLongTailKeywords($document),
+            'getKeywords' => $this->extractKeywordsFromBody($document, ['thủ tục cấp giấy phép môi trường']),
         ];
+
+        dd($result);
 
         return $result;
     }
@@ -325,11 +328,52 @@ class ContentAnalyze
 
     private function getKeywords(Crawler $document): array
     {
-        return [];
+        $bodyContent = $document->filter('body')->text();
+
+        $normalizedBodyContent = $this->normalizeString($bodyContent);
+
+        return $this->extractKeywords($normalizedBodyContent, $this->stopWords);
+    }
+
+    private function normalizeString(string $string): string
+    {
+        $string = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $string);
+        $string = mb_strtolower($string);
+
+        return trim($string);
+    }
+
+    private function extractKeywords(string $string, array $stopWords): array
+    {
+        $$string = preg_replace('/[^\p{L}\p{N}]+/u', '', $string);
+        $words = preg_split('/\s+/', $string);
+        $keywords = [];
+        foreach ($words as $word) {
+            if (! in_array($word, $stopWords) && strlen($word) >= 4) {
+                $keywords[] = $word;
+            }
+        }
+
+        return $keywords;
     }
 
     private function getLongTailKeywords(Crawler $document)
     {
         return [];
+    }
+
+    private function extractKeywordsFromBody(Crawler $document, array $keywords)
+    {
+        $body = $document->filter('body')->text();
+
+        $matches = [];
+        foreach ($keywords as $keyword) {
+            preg_match_all('/\b'.preg_quote($keyword, '/').'\b/i', $body, $match);
+            if (! empty($match[0])) {
+                $matches[$keyword] = $match[0];
+            }
+        }
+
+        return $matches;
     }
 }

@@ -69,4 +69,13 @@ class HookServiceProvider extends ServiceProvider
 
         return view('plugins/vig-seo::score-box', compact('data'))->render();
     }
+
+    public function setKeywords(string $screen, $object): bool
+    {
+        $meta = $object->getMetaData('seo_keyword', true);
+
+        MetaBox::saveMetaBoxData($object, 'seo_keyword', $meta);
+
+        return true;
+    }
 }
