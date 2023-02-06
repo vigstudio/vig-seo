@@ -11,6 +11,8 @@ class HookServiceProvider extends ServiceProvider
     public function boot()
     {
         add_action(BASE_ACTION_META_BOXES, [$this, 'addSeoScore'], 99, 2);
+        add_action(BASE_ACTION_AFTER_CREATE_CONTENT, [$this, 'setKeywords'], 127, 3);
+        add_action(BASE_ACTION_AFTER_UPDATE_CONTENT, [$this, 'setKeywords'], 127, 3);
     }
 
     public function addSeoScore(string $priority, $data)
@@ -35,17 +37,15 @@ class HookServiceProvider extends ServiceProvider
     {
         $args = func_get_args();
 
-        $meta = [
-            'seo_title' => null,
-            'seo_description' => null,
-        ];
+        $meta = [];
 
         if (! empty($args[0]) && $args[0]->id) {
-            $metadata = MetaBox::getMetaData($args[0], 'seo_meta', true);
+            $metadata = MetaBox::getMetaData($args[0], 'vig_seo_keywords', true);
         }
 
         if (! empty($metadata) && is_array($metadata)) {
             $meta = array_merge($meta, $metadata);
+            $meta = implode(',', $meta['keywords']);
         }
 
         $object = $args[0];
@@ -65,16 +65,15 @@ class HookServiceProvider extends ServiceProvider
         $content .= '</h1>';
         $content .= '</html>';
 
-        $data = ContentAnalyze::analyze($args[0]->url, $content);
+        $data = ContentAnalyze::analyze($args[0]->url, $content, $meta);
 
-        return view('plugins/vig-seo::score-box', compact('data'))->render();
+        return view('plugins/vig-seo::score-box', compact('data', 'meta'))->render();
     }
 
-    public function setKeywords(string $screen, $object): bool
+    public function setKeywords($screen, $request, $object): bool
     {
-        $meta = $object->getMetaData('seo_keyword', true);
-
-        MetaBox::saveMetaBoxData($object, 'seo_keyword', $meta);
+        $keywords = explode(',', $request->input('vig_seo_keywords'));
+        $data = MetaBox::saveMetaBoxData($object, 'vig_seo_keywords', ['keywords' => $keywords]);
 
         return true;
     }

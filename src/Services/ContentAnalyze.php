@@ -179,7 +179,7 @@ class ContentAnalyze
         $this->stopWords = $words;
     }
 
-    public function analyze($url, $content = '', $keywords = [])
+    public function analyze(string $url, string $content = '', string $keywords = ''): array
     {
         $this->baseUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST).'/'.ltrim(parse_url($url, PHP_URL_PATH), '/');
         $this->domainUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST);
@@ -200,10 +200,8 @@ class ContentAnalyze
             'links' => $this->getLinks($document),
             'keywords' => $this->getKeywords($document),
             'longTailKeywords' => $this->getLongTailKeywords($document),
-            'getKeywords' => $this->extractKeywordsFromBody($document, ['thủ tục cấp giấy phép môi trường']),
+            'getKeywords' => $this->extractKeywordsFromBody($document, explode(',', $keywords)),
         ];
-
-        dd($result);
 
         return $result;
     }
