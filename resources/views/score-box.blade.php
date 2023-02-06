@@ -45,7 +45,7 @@
     @foreach ($data['links'] as $key => $links)
         <ul class="list-group">
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                <b> + {{ $key }}</b>
+                <b> + {{ $key }} ({{ count($links) }})</b>
             </li>
             @foreach ($links as $value)
                 <li class="list-group-item d-flex justify-content-between align-items-center">

@@ -46,6 +46,8 @@ class HookServiceProvider extends ServiceProvider
         if (! empty($metadata) && is_array($metadata)) {
             $meta = array_merge($meta, $metadata);
             $meta = implode(',', $meta['keywords']);
+        } else {
+            $meta = '';
         }
 
         $object = $args[0];
