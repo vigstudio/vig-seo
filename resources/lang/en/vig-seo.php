@@ -19,6 +19,6 @@ return [
     'links_helper' => 'Links are the connections between pages on a website. They are used to help users navigate a website and find the information they are looking for.',
     'images' => 'Images',
     'images_helper' => 'Images are used to make a page more visually appealing and to help users understand the content on the page.',
-    'keywords' => 'Keywords',
-    'keywords_helper' => 'Keywords are the words or phrases that users type into search engines to find the information they are looking for.',
+    'keywords_suggest' => 'Keywords suggest',
+    'keywords_suggest_helper' => 'Keywords suggest',
 ];

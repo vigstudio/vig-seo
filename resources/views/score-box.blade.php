@@ -26,6 +26,17 @@
 
     </div>
 
+    <div class="p-3 my-3 shadow-sm bg-blue-chambray-opacity">
+        <div class="lh-1">
+            <h1 class="h6 text-white mb-0 lh-1">{{ trans('plugins/vig-seo::vig-seo.keywords_suggest') }}</h1>
+            <small class="text-white">{{ trans('plugins/vig-seo::vig-seo.keywords_suggest_helper') }}</small>
+        </div>
+
+        @foreach ($data['keywords'] as $key => $keywords)
+            <span class="badge bg-light text-dark">{{ $key }} ({{ count($keywords) }})</span>
+        @endforeach
+    </div>
+
 
     <div class="d-flex align-items-center p-3 my-3 text-white bg-purple shadow-sm">
         <div class="lh-1">
