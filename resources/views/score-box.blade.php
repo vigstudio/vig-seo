@@ -13,14 +13,17 @@
 
         <ul class="list-group mt-2">
             @foreach ($data['getKeywords'] as $key => $keyword)
-                <li class="list-group-item d-flex justify-content-between lh-sm">
-                    <div>
-                        <h6 class="my-0">{{ $key }}</h6>
-                    </div>
-                    <span class="text-muted">{{ trans('plugins/vig-seo::vig-seo.number_of_occurrences') }}: {{ count($keyword) }}</span>
-                </li>
+                @if (!empty($key))
+                    <li class="list-group-item d-flex justify-content-between lh-sm">
+                        <div>
+                            <h6 class="my-0">{{ $key }}</h6>
+                        </div>
+                        <span class="text-muted">{{ trans('plugins/vig-seo::vig-seo.number_of_occurrences') }}: {{ count($keyword) }}</span>
+                    </li>
+                @endif
             @endforeach
         </ul>
+
     </div>
 
 

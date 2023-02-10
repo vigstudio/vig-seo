@@ -2,6 +2,8 @@
 
 namespace VigStudio\VigSeo\Services;
 
+include __DIR__.'/../../vendor/autoload.php';
+
 use Symfony\Component\DomCrawler\Crawler;
 
 class ContentAnalyze
@@ -200,7 +202,6 @@ class ContentAnalyze
             'links' => $this->getLinks($document),
             'images' => $this->getImages($document),
             'keywords' => $this->getKeywords($document),
-            'longTailKeywords' => $this->getLongTailKeywords($document),
             'getKeywords' => $this->extractKeywordsFromBody($document, explode(',', $keywords)),
             'content' => $this->getContentToArray($document),
         ];
@@ -360,39 +361,52 @@ class ContentAnalyze
 
     private function getKeywords(Crawler $document): array
     {
-        $bodyContent = $document->filter('body')->text();
+        $contents = $this->getContentToArray($document);
+        $body = $document->filter('body')->text();
 
-        $normalizedBodyContent = $this->normalizeString($bodyContent);
+        $result = [];
+        foreach ($contents as $text) {
+            $keywords = $this->extractkeywords($text);
+            $result = array_merge($result, $keywords);
+        }
+        $result = array_unique($result);
 
-        return $this->extractKeywords($normalizedBodyContent, $this->stopWords);
-    }
-
-    private function normalizeString(string $string): string
-    {
-        $string = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $string);
-        $string = mb_strtolower($string);
-
-        return trim($string);
-    }
-
-    private function extractKeywords(string $text, array $stopWords): array
-    {
-        $words = preg_split("/[\s,]+/", $text);
-        $wordCounts = array_count_values($words);
-        $keywords = [];
-
-        foreach ($wordCounts as $word => $count) {
-            if (strlen($word) > 3 && ! in_array(strtolower($word), $stopWords)) {
-                $keywords[] = $word;
+        $matches = [];
+        foreach ($result as $keyword) {
+            preg_match_all('/\b'.preg_quote($keyword, '/').'\b/i', $body, $match);
+            if (! empty($match[0])) {
+                $matches[$keyword] = $match[0];
             }
         }
 
-        return $keywords;
+        return $matches;
     }
 
-    private function getLongTailKeywords(Crawler $document): array
+    private function extractkeywords(string $text): array
     {
-        return [];
+        $delimiters = ['.', ';', '?', '!', ':', ',', '(', ')', '[', ']', '{', '}'];
+        $stop_words = $this->stopWords;
+        $text = trim($text);
+        $delimiters = implode('|', $delimiters);
+        $sentences = preg_split("/[$delimiters]/", $text);
+        $result = [];
+        foreach ($sentences as $sentence) {
+            if (trim($sentence) === '') {
+                continue;
+            }
+            $words = explode(' ', $sentence);
+            $valid_words = [];
+            foreach ($words as $word) {
+                if (! in_array(strtolower($word), $stop_words) && ! is_numeric($word)) {
+                    $valid_words[] = $word;
+                }
+            }
+            if (count($valid_words) > 0 && count($valid_words) > 3 && count($valid_words) < 20) {
+                $result[] = trim(implode(' ', $valid_words));
+            }
+        }
+
+        return $result;
     }
 
     private function extractKeywordsFromBody(Crawler $document, array $keywords)
