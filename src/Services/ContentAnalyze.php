@@ -198,9 +198,11 @@ class ContentAnalyze
             'mainText' => $this->getMainText($document),
             'headers' => $this->getHeadings($document),
             'links' => $this->getLinks($document),
+            'images' => $this->getImages($document),
             'keywords' => $this->getKeywords($document),
             'longTailKeywords' => $this->getLongTailKeywords($document),
             'getKeywords' => $this->extractKeywordsFromBody($document, explode(',', $keywords)),
+            'content' => $this->getContentToArray($document),
         ];
 
         return $result;
@@ -211,6 +213,15 @@ class ContentAnalyze
         $crawler = new Crawler($body);
 
         return $crawler;
+    }
+
+    private function getContentToArray(Crawler $document): array
+    {
+        $nodes = $document->filter('body > *')->each(function (Crawler $node, $i) {
+            return $node->text();
+        });
+
+        return $nodes;
     }
 
     private function getTitle(Crawler $document): string|null
@@ -277,6 +288,29 @@ class ContentAnalyze
             'internal' => $internal,
             'external' => $external,
         ];
+    }
+
+    private function getImages(Crawler $document): array
+    {
+        $imagesWithAlt = $document->filter('img[alt]')->each(function (Crawler $node, $i) {
+            return [
+                'src' => $node->attr('src'),
+                'alt' => $node->attr('alt'),
+            ];
+        });
+
+        $imagesWithoutAlt = $document->filter('img:not([alt])')->each(function (Crawler $node, $i) {
+            return [
+                'src' => $node->attr('src'),
+            ];
+        });
+
+        $images = [
+            'withAlt' => $imagesWithAlt,
+            'withoutAlt' => $imagesWithoutAlt,
+        ];
+
+        return $images;
     }
 
     private function getMainText(Crawler $document): array

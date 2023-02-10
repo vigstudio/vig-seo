@@ -63,8 +63,8 @@ class HookServiceProvider extends ServiceProvider
         $content .= '</head>';
         $content .= '<body>';
         $content .= '<h1>'.$title.'</h1>';
+        $content .= '<p>'.$description.'</p>';
         $content .= $object->content;
-        $content .= '</h1>';
         $content .= '</html>';
 
         $data = ContentAnalyze::analyze($args[0]->url, $content, $meta);
@@ -78,5 +78,20 @@ class HookServiceProvider extends ServiceProvider
         $data = MetaBox::saveMetaBoxData($object, 'vig_seo_keywords', ['keywords' => $keywords]);
 
         return true;
+    }
+
+    public function highlightContent($string, $value)
+    {
+        $keyword = $value['originalText'];
+        $start = $value['startIndex'];
+        $length = ($value['endIndex']) - ($value['startIndex']);
+
+        $start = mb_strpos($string, $keyword, 0, 'UTF-8');
+        $length = mb_strlen($keyword, 'UTF-8');
+        $highlighted = mb_substr($string, $start, $length, 'UTF-8');
+        $before = mb_substr($string, 0, $start, 'UTF-8');
+        $after = mb_substr($string, $start + $length, mb_strlen($string, 'UTF-8'), 'UTF-8');
+
+        return $before.' <b style="background:red">'.$highlighted.'</b>&nbsp; <b style="background:green">'.$value['suggestion'].'</b> '.$after;
     }
 }
