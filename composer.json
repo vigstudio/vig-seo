@@ -1,6 +1,6 @@
 {
     "name": "vigstudio/vig-seo",
-    "type": "botble-plugin",
+    "type": "package",
     "description": "SEO scanner for Botble CMS",
     "homepage": "http://nghiane.com",
     "authors": [

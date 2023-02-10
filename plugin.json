@@ -3,8 +3,8 @@
     "name": "VigSeo",
     "namespace": "VigStudio\\VigSeo\\",
     "provider": "VigStudio\\VigSeo\\Providers\\VigSeoServiceProvider",
-    "author": "N/A",
-    "url": "N/A",
-    "version": "0.0.1",
+    "author": "Nghĩa nè",
+    "url": "https://github.com/vigstudio/vig-seo",
+    "version": "0.0.2",
     "description": "The description for module vig_seo"
 }
