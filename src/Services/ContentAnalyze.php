@@ -2,7 +2,7 @@
 
 namespace VigStudio\VigSeo\Services;
 
-include __DIR__.'/../../vendor/autoload.php';
+include __DIR__ . '/../../vendor/autoload.php';
 
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -18,8 +18,8 @@ class ContentAnalyze
 
     public function analyze(string $url, string $content = '', string $keywords = ''): array
     {
-        $this->baseUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST).'/'.ltrim(parse_url($url, PHP_URL_PATH), '/');
-        $this->domainUrl = parse_url($url, PHP_URL_SCHEME).'://'.parse_url($url, PHP_URL_HOST);
+        $this->baseUrl = parse_url($url, PHP_URL_SCHEME) . '://' . parse_url($url, PHP_URL_HOST) . '/' . ltrim(parse_url($url, PHP_URL_PATH), '/');
+        $this->domainUrl = parse_url($url, PHP_URL_SCHEME) . '://' . parse_url($url, PHP_URL_HOST);
         $this->domainname = parse_url($url, PHP_URL_HOST);
 
         $document = $this->parseHtml($content);
@@ -241,12 +241,13 @@ class ContentAnalyze
     private function extractKeywordsFromBody(Crawler $document, array $keywords)
     {
         $body = $document->filter('body')->text();
-
         $matches = [];
         foreach ($keywords as $keyword) {
-            preg_match_all('/\b'.preg_quote($keyword, '/').'\b/i', $body, $match);
-            if (! empty($match[0])) {
-                $matches[$keyword] = $match[0];
+            if (! empty($keyword)) {
+                preg_match_all('/\b' . preg_quote($keyword, '/') . '\b/i', $body, $match);
+                if (! empty($match[0])) {
+                    $matches[$keyword] = $match[0];
+                }
             }
         }
 
