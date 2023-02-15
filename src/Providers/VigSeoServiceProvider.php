@@ -19,7 +19,7 @@ class VigSeoServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind(VigSeoInterface::class, function () {
-            return new VigSeoCacheDecorator(new VigSeoRepository(new VigSeo));
+            return new VigSeoCacheDecorator(new VigSeoRepository(new VigSeo()));
         });
 
         $this->app->singleton('vig-seo-analyzer', ContentAnalyze::class);
@@ -41,15 +41,15 @@ class VigSeoServiceProvider extends ServiceProvider
         });
 
         Event::listen(RouteMatched::class, function () {
-            dashboard_menu()->registerItem([
-                'id' => 'cms-plugins-vig-seo',
-                'priority' => 5,
-                'parent_id' => null,
-                'name' => 'plugins/vig-seo::vig-seo.name',
-                'icon' => 'fa fa-list',
-                'url' => route('vig-seo.index'),
-                'permissions' => ['vig-seo.index'],
-            ]);
+            // dashboard_menu()->registerItem([
+            //     'id' => 'cms-plugins-vig-seo',
+            //     'priority' => 5,
+            //     'parent_id' => null,
+            //     'name' => 'plugins/vig-seo::vig-seo.name',
+            //     'icon' => 'fa fa-list',
+            //     'url' => route('vig-seo.index'),
+            //     'permissions' => ['vig-seo.index'],
+            // ]);
         });
     }
 

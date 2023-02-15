@@ -5,6 +5,6 @@
     "provider": "VigStudio\\VigSeo\\Providers\\VigSeoServiceProvider",
     "author": "Nghĩa nè",
     "url": "https://github.com/vigstudio/vig-seo",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "The description for module vig_seo"
 }
