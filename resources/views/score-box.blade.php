@@ -1,7 +1,7 @@
 <main class="container">
     <div class="form-group mb-3">
         <label for="seo_title" class="control-label">{{ trans('plugins/vig-seo::vig-seo.focus_keyphrase') }}</label>
-        {!! Form::text('vig_seo_title', $meta ?? old('vig_seo_title'), ['class' => 'form-control', 'id' => 'seo_title', 'placeholder' => 'Focus keyphrase', 'data-counter' => 300]) !!}
+        {!! Form::text('vig_seo_keywords', $meta ?? old('vig_seo_keywords'), ['class' => 'form-control', 'id' => 'seo_title', 'placeholder' => 'Focus keyphrase', 'data-counter' => 300]) !!}
         {{ Form::helper(trans('plugins/vig-seo::vig-seo.focus_keyphrase_helper')) }}
     </div>
 
@@ -32,9 +32,14 @@
             <small class="text-white">{{ trans('plugins/vig-seo::vig-seo.keywords_suggest_helper') }}</small>
         </div>
 
-        @foreach ($data['keywords'] as $key => $keywords)
-            <span class="badge bg-light text-dark">{{ $key }} ({{ count($keywords) }})</span>
-        @endforeach
+        <tags class="tagify tags">
+            @foreach ($data['keywords'] as $key => $keywords)
+                <tag title="{{ $key }}" class="tagify__tag " value="{{ $key }}">
+                    <div><span class="tagify__tag-text">{{ $key }} ({{ count($keywords) }})</span></div>
+                </tag>
+            @endforeach
+        </tags>
+
     </div>
 
 
