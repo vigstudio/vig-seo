@@ -17,7 +17,13 @@ class HookServiceProvider extends ServiceProvider
 
     public function addSeoScore(string $priority, $data)
     {
-        if ($priority == 'advanced' && ! empty($data) && in_array(get_class($data), config('packages.seo-helper.general.supported', []))) {
+        if ($priority == 'advanced'
+            && ! empty($data)
+            && in_array(get_class($data), [
+                'Botble\Blog\Models\Post',
+                'Botble\Page\Models\Page',
+            ])
+        ) {
             MetaBox::addMetaBox(
                 'seo_score_wrap',
                 'SEO Scanner',
@@ -58,12 +64,12 @@ class HookServiceProvider extends ServiceProvider
         $content = '';
         $content .= '<html>';
         $content .= '<head>';
-        $content .= '<title>'.$title.'</title>';
-        $content .= '<meta name="description" content="'.$description.'">';
+        $content .= '<title>' . $title . '</title>';
+        $content .= '<meta name="description" content="' . $description . '">';
         $content .= '</head>';
         $content .= '<body>';
-        $content .= '<h1>'.$title.'</h1>';
-        $content .= '<p>'.$description.'</p>';
+        $content .= '<h1>' . $title . '</h1>';
+        $content .= '<p>' . $description . '</p>';
         $content .= $object->content;
         $content .= '</html>';
 
@@ -92,6 +98,6 @@ class HookServiceProvider extends ServiceProvider
         $before = mb_substr($string, 0, $start, 'UTF-8');
         $after = mb_substr($string, $start + $length, mb_strlen($string, 'UTF-8'), 'UTF-8');
 
-        return $before.' <b style="background:red">'.$highlighted.'</b>&nbsp; <b style="background:green">'.$value['suggestion'].'</b> '.$after;
+        return $before . ' <b style="background:red">' . $highlighted . '</b>&nbsp; <b style="background:green">' . $value['suggestion'] . '</b> ' . $after;
     }
 }

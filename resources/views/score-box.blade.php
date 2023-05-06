@@ -32,13 +32,11 @@
             <small class="text-white">{{ trans('plugins/vig-seo::vig-seo.keywords_suggest_helper') }}</small>
         </div>
 
-        <tags class="tagify">
-            @foreach ($data['keywords'] as $key => $keywords)
-                <tag title="{{ $key }}" class="tagify__tag" value="{{ $key }}">
-                    <div><span class="tagify__tag-text">{{ $key }} ({{ count($keywords) }})</span></div>
-                </tag>
-            @endforeach
-        </tags>
+
+        @foreach ($data['keywords'] as $key => $keywords)
+            <span class="badge badge-pill badge-info">{{ $key }} ({{ count($keywords) }})</span>
+        @endforeach
+
 
     </div>
 
